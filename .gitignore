@@ -1,0 +1,4 @@
+mcp_server_stderr.log
+*.py.bak
+__pycache__/
+*.pyc

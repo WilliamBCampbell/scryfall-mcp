@@ -1,0 +1,702 @@
+{
+  "name": "scryfall-mcp",
+  "displayName": "Scryfall API MCP Server",
+  "description": "Provides tools to interact with the Scryfall API for Magic: The Gathering card data.",
+  "version": "1.0.0",
+  "license": "MIT",
+  "runtime": {
+    "command": [
+      "python",
+      "scryfall_mcp_server.py"
+    ],
+    "type": "stdio"
+  },
+  "tools": [
+    {
+      "name": "search_cards",
+      "description": "Searches for cards on Scryfall using a fulltext search query.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "A fulltext search query. Maximum length: 1000 Unicode characters."
+          },
+          "unique": {
+            "type": "string",
+            "description": "The strategy for omitting similar cards (cards, art, prints).",
+            "enum": ["cards", "art", "prints"],
+            "default": "cards"
+          },
+          "order": {
+            "type": "string",
+            "description": "The method to sort returned cards.",
+            "enum": ["name", "set", "released", "rarity", "color", "usd", "tix", "eur", "cmc", "power", "toughness", "edhrec", "penny", "artist", "review"],
+            "default": "name"
+          },
+          "direction": {
+            "type": "string",
+            "description": "The direction to sort cards.",
+            "enum": ["auto", "asc", "desc"],
+            "default": "auto"
+          },
+          "include_extras": {
+            "type": "boolean",
+            "description": "If true, extra cards (tokens, planes, etc) will be included.",
+            "default": false
+          },
+          "include_multilingual": {
+            "type": "boolean",
+            "description": "If true, cards in every language supported by Scryfall will be included.",
+            "default": false
+          },
+          "include_variations": {
+            "type": "boolean",
+            "description": "If true, rare card variants will be included.",
+            "default": false
+          },
+          "page": {
+            "type": "integer",
+            "description": "The page number to return.",
+            "default": 1
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "get_card_by_name",
+      "description": "Returns a Card based on a name search string.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The card name to search for."
+          },
+          "search_type": {
+            "type": "string",
+            "description": "Type of search: 'exact' or 'fuzzy'.",
+            "enum": ["exact", "fuzzy"],
+            "default": "fuzzy"
+          },
+          "set_code": {
+            "type": "string",
+            "description": "A set code to limit the search to one set (optional)."
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "get_card_by_tcgplayer_id",
+      "description": "Returns a single card with the given tcgplayer_id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tcgplayer_id": {
+            "type": "integer",
+            "description": "The tcgplayer_id (productId) of the card."
+          }
+        },
+        "required": ["tcgplayer_id"]
+      }
+    },
+    {
+      "name": "get_cards_from_collection",
+      "description": "Accepts an array of card identifiers and returns a List object with the collection of requested cards.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifiers": {
+            "type": "array",
+            "description": "An array of JSON objects, each one a card identifier. Max 75.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string", "format": "uuid", "description": "Scryfall ID"},
+                "mtgo_id": {"type": "integer", "description": "MTGO ID"},
+                "multiverse_id": {"type": "integer", "description": "Multiverse ID"},
+                "oracle_id": {"type": "string", "format": "uuid", "description": "Oracle ID"},
+                "illustration_id": {"type": "string", "format": "uuid", "description": "Illustration ID"},
+                "name": {"type": "string", "description": "Card name"},
+                "set": {"type": "string", "description": "Set code (use with name or collector_number)"},
+                "collector_number": {"type": "string", "description": "Collector number (use with set)"}
+              },
+              "oneOf": [
+                {"required": ["id"]},
+                {"required": ["mtgo_id"]},
+                {"required": ["multiverse_id"]},
+                {"required": ["oracle_id"]},
+                {"required": ["illustration_id"]},
+                {"required": ["name"]},
+                {"required": ["name", "set"]},
+                {"required": ["collector_number", "set"]}
+              ]
+            }
+          }
+        },
+        "required": ["identifiers"]
+      }
+    },
+    {
+      "name": "get_random_card",
+      "description": "Returns a single random Card object. Supports optional fulltext search filtering.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "An optional fulltext search query to filter the pool of random cards."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return.",
+            "enum": ["json", "text", "image"],
+            "default": "json"
+          },
+          "face": {
+            "type": "string",
+            "description": "If using the image format and this parameter has the value back, the back face of the card will be returned."
+          },
+          "version": {
+            "type": "string",
+            "description": "The image version to return when using the image format.",
+            "enum": ["small", "normal", "large", "png", "art_crop", "border_crop"],
+            "default": "large"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_card_by_set_code_and_number",
+      "description": "Returns a single card with the given set code and collector number. Optionally supports language.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The three to five-letter set code."
+          },
+          "number": {
+            "type": "string",
+            "description": "The collector number."
+          },
+          "lang": {
+            "type": "string",
+            "description": "The 2-3 character language code (optional)."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return.",
+            "enum": ["json", "text", "image"],
+            "default": "json"
+          },
+          "face": {
+            "type": "string",
+            "description": "If using the image format and this parameter has the value back, the back face of the card will be returned."
+          },
+          "version": {
+            "type": "string",
+            "description": "The image version to return when using the image format.",
+            "enum": ["small", "normal", "large", "png", "art_crop", "border_crop"],
+            "default": "large"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        },
+        "required": ["code", "number"]
+      }
+    },
+    {
+      "name": "get_card_by_arena_id",
+      "description": "Returns a single card with the given Magic: The Gathering Arena ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "arena_id": {
+            "type": "integer",
+            "description": "The Arena ID."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return.",
+            "enum": ["json", "text", "image"],
+            "default": "json"
+          },
+          "face": {
+            "type": "string",
+            "description": "If using the image format and this parameter has the value back, the back face of the card will be returned."
+          },
+          "version": {
+            "type": "string",
+            "description": "The image version to return when using the image format.",
+            "enum": ["small", "normal", "large", "png", "art_crop", "border_crop"],
+            "default": "large"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        },
+        "required": ["arena_id"]
+      }
+    },
+    {
+      "name": "get_card_by_scryfall_id",
+      "description": "Returns a single card with the given Scryfall ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scryfall_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Scryfall ID."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return.",
+            "enum": ["json", "text", "image"],
+            "default": "json"
+          },
+          "face": {
+            "type": "string",
+            "description": "If using the image format and this parameter has the value back, the back face of the card will be returned."
+          },
+          "version": {
+            "type": "string",
+            "description": "The image version to return when using the image format.",
+            "enum": ["small", "normal", "large", "png", "art_crop", "border_crop"],
+            "default": "large"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        },
+        "required": ["scryfall_id"]
+      }
+    },
+    {
+      "name": "get_card_rulings_by_scryfall_id",
+      "description": "Returns a List of rulings for a card with the given Scryfall ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scryfall_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Scryfall ID."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        },
+        "required": ["scryfall_id"]
+      }
+    },
+    {
+      "name": "parse_mana_cost",
+      "description": "Parses the given mana cost parameter and returns Scryfall’s interpretation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cost": {
+            "type": "string",
+            "description": "The mana string to parse."
+          },
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        },
+        "required": ["cost"]
+      }
+    },
+    {
+      "name": "get_catalog_artist_names",
+      "description": "Returns a list of all canonical artist names in Scryfall’s database.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_word_bank",
+      "description": "Returns a Catalog of all English words (length 2+) that could appear in a card name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_supertypes",
+      "description": "Returns a Catalog of all Magic card supertypes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_card_types",
+      "description": "Returns a Catalog of all Magic card types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_artifact_types",
+      "description": "Returns a Catalog of all artifact types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_battle_types",
+      "description": "Returns a Catalog of all Battle types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_creature_types",
+      "description": "Returns a Catalog of all creature types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_enchantment_types",
+      "description": "Returns a Catalog of all enchantment types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_land_types",
+      "description": "Returns a Catalog of all land types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_planeswalker_types",
+      "description": "Returns a Catalog of all Planeswalker types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_spell_types",
+      "description": "Returns a Catalog of all spell types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_powers",
+      "description": "Returns a Catalog of all possible values for a creature or vehicle’s power.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_toughnesses",
+      "description": "Returns a Catalog of all possible values for a creature or vehicle’s toughness.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_loyalties",
+      "description": "Returns a Catalog of all possible values for a Planeswalker’s loyalty.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_keyword_abilities",
+      "description": "Returns a Catalog of all keyword abilities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_keyword_actions",
+      "description": "Returns a Catalog of all keyword actions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_ability_words",
+      "description": "Returns a Catalog of all ability words.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "get_catalog_flavor_words",
+      "description": "Returns a Catalog of all flavor words.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "The data format to return. This method only supports json.",
+            "enum": ["json"],
+            "default": "json"
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "If true, the returned JSON will be prettified.",
+            "default": false
+          }
+        }
+      }
+    }
+  ]
+}
